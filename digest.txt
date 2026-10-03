@@ -8,6 +8,7 @@ Directory structure:
         │   └── options.lua
         └── plugins/
             ├── ai.lua
+            ├── codecompanion.lua
             ├── colorscheme.lua
             ├── completion.lua
             ├── formatting.lua
@@ -15,6 +16,7 @@ Directory structure:
             ├── lsp.lua
             ├── oil.lua
             ├── telescope.lua
+            ├── toggleterm.lua
             └── treesitter.lua
 
 ================================================
@@ -27,14 +29,14 @@ require("core.keymaps")
 -- 2. Automatická instalace lazy.nvim (pokud ho ještě nemáš stažený v systému)
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not (vim.uv or vim.loop).fs_stat(lazypath) then
-  vim.fn.system({
-    "git",
-    "clone",
-    "--filter=blob:none",
-    "https://github.com/folke/lazy.nvim.git",
-    "--branch=stable",
-    lazypath,
-  })
+	vim.fn.system({
+		"git",
+		"clone",
+		"--filter=blob:none",
+		"https://github.com/folke/lazy.nvim.git",
+		"--branch=stable",
+		lazypath,
+	})
 end
 vim.opt.rtp:prepend(lazypath)
 
@@ -54,6 +56,7 @@ FILE: lazy-lock.json
   "cmp-nvim-lsp": { "branch": "main", "commit": "cbc7b02bb99fae35cb42f514762b89b5126651ef" },
   "cmp-path": { "branch": "main", "commit": "c642487086dbd9a93160e1679a1327be111cbc25" },
   "cmp_luasnip": { "branch": "master", "commit": "98d9cb5c2c38532bd9bdb481067b20fea8f32e90" },
+  "codecompanion.nvim": { "branch": "main", "commit": "ff4a913c3bb6ace172edd2e4cf6cd1d43200aea0" },
   "conform.nvim": { "branch": "master", "commit": "016802de402556da54c36bd7359b441266b01cdd" },
   "dressing.nvim": { "branch": "master", "commit": "2d7c2db2507fa3c4956142ee607431ddb2828639" },
   "gitsigns.nvim": { "branch": "main", "commit": "5be654f2232c10ddcad19c1607a67b6b4b78fc29" },
@@ -73,6 +76,7 @@ FILE: lazy-lock.json
   "render-markdown.nvim": { "branch": "main", "commit": "4663eb3ecd538bd5062628fb6d95bbe6bdca78f6" },
   "rose-pine": { "branch": "main", "commit": "ff483051a47e27d84bdef47703538df1ed9f4a47" },
   "telescope.nvim": { "branch": "0.1.x", "commit": "a0bbec21143c7bc5f8bb02e0005fa0b982edc026" },
+  "toggleterm.nvim": { "branch": "main", "commit": "50ea089fc548917cc3cc16b46a8211833b9e3c7c" },
   "tokyonight.nvim": { "branch": "main", "commit": "cdc07ac78467a233fd62c493de29a17e0cf2b2b6" }
 }
 
@@ -81,18 +85,22 @@ FILE: lazy-lock.json
 ================================================
 FILE: lua/core/keymaps.lua
 ================================================
+vim.g.mapleader = " "
+vim.g.maplocalleader = " "
+
 -- Lepší změna velikosti oken (respektuje směr šipek)
-vim.keymap.set('n', '<M-j>', '<cmd>wincmd -<CR>') -- Zmenšit vertikálně
-vim.keymap.set('n', '<M-k>', '<cmd>wincmd +<CR>') -- Zvětšit vertikálně
-vim.keymap.set('n', '<M-h>', '<cmd>wincmd <<CR>') -- Zmenšit horizontálně
-vim.keymap.set('n', '<M-l>', '<cmd>wincmd ><CR>') -- Zvětšit horizontálně
+vim.keymap.set("n", "<M-j>", "<cmd>wincmd -<CR>") -- Zmenšit vertikálně
+vim.keymap.set("n", "<M-k>", "<cmd>wincmd +<CR>") -- Zvětšit vertikálně
+vim.keymap.set("n", "<M-h>", "<cmd>wincmd <<CR>") -- Zmenšit horizontálně
+vim.keymap.set("n", "<M-l>", "<cmd>wincmd ><CR>") -- Zvětšit horizontálně
 
 -- V Insert módu (psaní) stačí napsat rychle 'jk' a přepne tě to do Normal módu
-vim.keymap.set('i', 'jk', '<Esc>', { desc = 'Návrat do Normal módu', nowait = true })
+vim.keymap.set("i", "jk", "<Esc>", { desc = "Návrat do Normal módu", nowait = true })
 
 -- V terminálu stačí zmáčknout Esc pro návrat do Normal módu
-vim.keymap.set('t', '<Esc>', [[<C-\><C-n>]], { desc = 'Ukončit psaní v terminálu' })
+vim.keymap.set("t", "<Esc>", [[<C-\><C-n>]], { desc = "Ukončit psaní v terminálu" })
 
+vim.keymap.set("n", "<leader>ag", ":TermExec cmd='agy'<CR>", { silent = true })
 
 
 
@@ -119,7 +127,38 @@ vim.opt.expandtab = true
 vim.opt.splitright = true
 vim.opt.splitbelow = true
 
+vim.opt.foldminlines = 1
+vim.opt.foldcolumn = "2"
+vim.opt.foldmethod = "indent"
+vim.opt.foldlevel = 99 -- zajistí, že soubor se otevře rozbalený
 
+vim.api.nvim_create_autocmd("FileType", {
+	pattern = "python",
+	callback = function()
+		vim.opt_local.foldmethod = "indent"
+		vim.opt_local.foldminlines = 1
+		vim.opt_local.foldlevel = 99
+	end,
+})
+
+vim.filetype.add({
+	extension = {
+		jinja = "htmldjango",
+		jinja2 = "htmldjango",
+		j2 = "htmldjango",
+		html = "htmldjango",
+	},
+})
+
+vim.api.nvim_create_autocmd("FileType", {
+	pattern = { "html", "htmldjango", "lua", "javascript", "typescript", "css" },
+	callback = function()
+		vim.opt_local.tabstop = 2
+		vim.opt_local.shiftwidth = 2
+		vim.opt_local.softtabstop = 2
+		vim.opt_local.expandtab = true
+	end,
+})
 
 
 
@@ -127,37 +166,70 @@ vim.opt.splitbelow = true
 FILE: lua/plugins/ai.lua
 ================================================
 return {
-  {
-    "yetone/avante.nvim",
-    event = "VeryLazy",
-    lazy = false,
-    version = false,
-    opts = {
-      provider = "gemini",
-      auto_suggestions_provider = "gemini",
-      -- Zde je ta změna: vše se nově dává do tabulky providers
-      providers = {
-        gemini = {
-          model = "gemini-3.1-flash-lite", -- gemini-2.5-flash , gemini-2.5-flash
-          max_tokens = 4096,
-          temperature = 0,
-        },
-      },
-    },
-    build = "make",
-    dependencies = {
-      "stevearc/dressing.nvim",
-      "nvim-lua/plenary.nvim",
-      "MunifTanjim/nui.nvim",
-      "hrsh7th/nvim-cmp",
-      "nvim-tree/nvim-web-devicons",
-      {
-        "MeanderingProgrammer/render-markdown.nvim",
-        opts = { file_types = { "markdown", "Avante" } },
-        ft = { "markdown", "Avante" },
-      },
-    },
-  }
+	{
+		"yetone/avante.nvim",
+		event = "VeryLazy",
+		lazy = false,
+		version = false,
+		opts = {
+			provider = "gemini",
+			auto_suggestions_provider = "gemini",
+			-- Zde je ta změna: vše se nově dává do tabulky providers
+			providers = {
+				gemini = {
+					model = "gemini-3.1-flash-lite", -- gemini-2.5-flash , gemini-2.5-flash
+					max_tokens = 4096,
+					temperature = 0,
+				},
+			},
+		},
+		build = "make",
+		dependencies = {
+			"stevearc/dressing.nvim",
+			"nvim-lua/plenary.nvim",
+			"MunifTanjim/nui.nvim",
+			"hrsh7th/nvim-cmp",
+			"nvim-tree/nvim-web-devicons",
+			{
+				"MeanderingProgrammer/render-markdown.nvim",
+				opts = { file_types = { "markdown", "Avante" } },
+				ft = { "markdown", "Avante" },
+			},
+		},
+	},
+}
+
+
+
+================================================
+FILE: lua/plugins/codecompanion.lua
+================================================
+-- ~/.config/nvim/lua/plugins/codecompanion.lua
+return {
+	"olimorris/codecompanion.nvim",
+	dependencies = { "nvim-lua/plenary.nvim" },
+	config = function()
+		require("codecompanion").setup({
+			strategies = {
+				inline = { adapter = "agy_cli" },
+				chat = { adapter = "agy_cli" },
+			},
+			adapters = {
+				agy_cli = function()
+					return require("codecompanion.adapters").extend("cmd", {
+						name = "agy_cli",
+						formatted_name = "Antigravity CLI",
+						roles = {
+							user = "user",
+							model = "assistant",
+						},
+						command = "agy",
+						args = { "-p" }, -- agy přečte zadaný prompt
+					})
+				end,
+			},
+		})
+	end,
 }
 
 
@@ -199,48 +271,48 @@ return {
 FILE: lua/plugins/completion.lua
 ================================================
 return {
-  {
-    "hrsh7th/nvim-cmp",
-    dependencies = {
-      "hrsh7th/cmp-nvim-lsp", -- Nápověda z LSP
-      "hrsh7th/cmp-path",     -- Nápověda pro cesty k souborům
-      "hrsh7th/cmp-buffer",   -- Nápověda ze slov v aktuálním souboru
-      "L3MON4D3/LuaSnip",     -- Engine pro snippety
-      "saadparwaiz1/cmp_luasnip",
-    },
-    config = function()
-      local cmp = require("cmp")
+	{
+		"hrsh7th/nvim-cmp",
+		dependencies = {
+			"hrsh7th/cmp-nvim-lsp", -- Nápověda z LSP
+			"hrsh7th/cmp-path", -- Nápověda pro cesty k souborům
+			"hrsh7th/cmp-buffer", -- Nápověda ze slov v aktuálním souboru
+			"L3MON4D3/LuaSnip", -- Engine pro snippety
+			"saadparwaiz1/cmp_luasnip",
+		},
+		config = function()
+			local cmp = require("cmp")
 
-      cmp.setup({
-        snippet = {
-          expand = function(args)
-            require("luasnip").lsp_expand(args.body)
-          end,
-        },
-        mapping = cmp.mapping.preset.insert({
-          ["<C-b>"] = cmp.mapping.scroll_docs(-4),
-          ["<C-f>"] = cmp.mapping.scroll_docs(4),
-          ["<C-Space>"] = cmp.mapping.complete(), -- Vyvolat nápovědu ručně
-          ["<C-e>"] = cmp.mapping.abort(),        -- Zavřít nápovědu
-          ["<CR>"] = cmp.mapping.confirm({ select = true }), -- Potvrdit Enterem
-          ["<Tab>"] = cmp.mapping(function(fallback)          -- Procházení tabulátorem
-            if cmp.visible() then
-              cmp.select_next_item()
-            else
-              fallback()
-            end
-          end, { "i", "s" }),
-        }),
-        sources = cmp.config.sources({
-          { name = "nvim_lsp" }, -- Přednost má LSP
-          { name = "luasnip" },  -- Pak snippety
-        }, {
-          { name = "buffer" },   -- Nakonec slova ze souboru
-          { name = "path" },     -- A cesty
-        }),
-      })
-    end,
-  },
+			cmp.setup({
+				snippet = {
+					expand = function(args)
+						require("luasnip").lsp_expand(args.body)
+					end,
+				},
+				mapping = cmp.mapping.preset.insert({
+					["<C-b>"] = cmp.mapping.scroll_docs(-4),
+					["<C-f>"] = cmp.mapping.scroll_docs(4),
+					["<C-Space>"] = cmp.mapping.complete(), -- Vyvolat nápovědu ručně
+					["<C-e>"] = cmp.mapping.abort(), -- Zavřít nápovědu
+					["<CR>"] = cmp.mapping.confirm({ select = true }), -- Potvrdit Enterem
+					["<Tab>"] = cmp.mapping(function(fallback) -- Procházení tabulátorem
+						if cmp.visible() then
+							cmp.select_next_item()
+						else
+							fallback()
+						end
+					end, { "i", "s" }),
+				}),
+				sources = cmp.config.sources({
+					{ name = "nvim_lsp" }, -- Přednost má LSP
+					{ name = "luasnip" }, -- Pak snippety
+				}, {
+					{ name = "buffer" }, -- Nakonec slova ze souboru
+					{ name = "path" }, -- A cesty
+				}),
+			})
+		end,
+	},
 }
 
 
@@ -249,23 +321,31 @@ return {
 FILE: lua/plugins/formatting.lua
 ================================================
 return {
-  "stevearc/conform.nvim",
-  event = { "BufWritePre" },
-  cmd = { "ConformInfo" },
-  opts = {
-    formatters_by_ft = {
-      python = { "ruff_organize_imports", "ruff_format" }, -- Ruff zformátuje kód i seřadí importy
-      lua = { "stylua" },
-      javascript = { "prettier" },
-      typescript = { "prettier" },
-      html = { "prettier" },
-      css = { "prettier" },
-    },
-    format_on_save = {
-      timeout_ms = 500,
-      lsp_fallback = true, -- Pokud není dostupný samostatný formátovač, použije se LSP
-    },
-  },
+	"stevearc/conform.nvim",
+	event = { "BufWritePre" },
+	cmd = { "ConformInfo" },
+	opts = {
+		formatters_by_ft = {
+			python = { "ruff_organize_imports", "ruff_format" },
+			lua = { "stylua" },
+			javascript = { "prettier" },
+			typescript = { "prettier" },
+			html = { "prettier" },
+			css = { "prettier" },
+			htmldjango = { "djhtml" },
+		},
+		formatters = {
+			djhtml = {
+				command = "djhtml",
+				args = { "-t", "2", "-" },
+			},
+		},
+		format_on_save = {
+			timeout_ms = 1000,
+			async = true,
+			lsp_fallback = true,
+		},
+	},
 }
 
 
@@ -365,13 +445,13 @@ return {
 FILE: lua/plugins/oil.lua
 ================================================
 return {
-  "stevearc/oil.nvim",
-  opts = {},
-  dependencies = { "nvim-tree/nvim-web-devicons" },
-  config = function()
-    require("oil").setup()
-    vim.keymap.set("n", "-", "<CMD>Oil<CR>", { desc = "Otevřít rodičovský adresář" })
-  end,
+	"stevearc/oil.nvim",
+	opts = {},
+	dependencies = { "nvim-tree/nvim-web-devicons" },
+	config = function()
+		require("oil").setup()
+		vim.keymap.set("n", "-", "<CMD>Oil<CR>", { desc = "Otevřít rodičovský adresář" })
+	end,
 }
 
 
@@ -380,15 +460,26 @@ return {
 FILE: lua/plugins/telescope.lua
 ================================================
 return {
-  "nvim-telescope/telescope.nvim",
-  branch = "0.1.x",
-  dependencies = { "nvim-lua/plenary.nvim" },
-  config = function()
-    local builtin = require("telescope.builtin")
-    vim.keymap.set("n", "<leader>ff", builtin.find_files, { desc = "Hledat soubory" })
-    vim.keymap.set("n", "<leader>fg", builtin.live_grep, { desc = "Hledat text v projektu" })
-    vim.keymap.set("n", "<leader>fb", builtin.buffers, { desc = "Otevřené buffery" })
-  end,
+	"nvim-telescope/telescope.nvim",
+	branch = "0.1.x",
+	dependencies = { "nvim-lua/plenary.nvim" },
+	config = function()
+		local builtin = require("telescope.builtin")
+		vim.keymap.set("n", "<leader>ff", builtin.find_files, { desc = "Hledat soubory" })
+		vim.keymap.set("n", "<leader>fg", builtin.live_grep, { desc = "Hledat text v projektu" })
+		vim.keymap.set("n", "<leader>fb", builtin.buffers, { desc = "Otevřené buffery" })
+	end,
+}
+
+
+
+================================================
+FILE: lua/plugins/toggleterm.lua
+================================================
+return {
+	"akinsho/toggleterm.nvim",
+	version = "*",
+	config = true,
 }
 
 
@@ -397,24 +488,34 @@ return {
 FILE: lua/plugins/treesitter.lua
 ================================================
 return {
-  "nvim-treesitter/nvim-treesitter",
-  build = ":TSUpdate",
-  config = function()
-    require("nvim-treesitter").setup({
-      ensure_installed = { 
-        "c", "lua", "vim", "vimdoc", "query", 
-        "javascript", "typescript", "python", "html", "css",
-        "ninja", "rst" -- Volitelné: užitečné parsery pro Python ekosystém
-      },
-      auto_install = true,
-      highlight = {
-        enable = true,
-        additional_vim_regex_highlighting = false,
-      },
-      -- Zapnutí modulu pro párování a zvýrazňování bloků (def, class, if...)
-      indent = { enable = true },
-    })
-  end,
+	"nvim-treesitter/nvim-treesitter",
+	build = ":TSUpdate",
+	config = function()
+		require("nvim-treesitter").setup({
+			ensure_installed = {
+				"c",
+				"lua",
+				"vim",
+				"vimdoc",
+				"query",
+				"javascript",
+				"typescript",
+				"python",
+				"html",
+				"css",
+				"ninja",
+				"rst",
+				"htmldjango", -- Zvýrazňování pro HTML + Jinja2
+			},
+			auto_install = true,
+			highlight = {
+				enable = true,
+				additional_vim_regex_highlighting = false,
+			},
+			-- Zapnutí modulu pro párování a zvýrazňování bloků (def, class, if...)
+			indent = { enable = true },
+		})
+	end,
 }
 
 
